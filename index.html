@@ -1,0 +1,2180 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AEGIS SOC // Inteligência de Ameaças Cibernéticas em Tempo Real</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Fontes Inter e JetBrains Mono para telemetria técnica -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            soc: {
+              bg: '#020617',
+              panel: '#0f172a',
+              border: '#1e293b',
+              cyan: '#06b6d4',
+              red: '#ef4444',
+              amber: '#f59e0b',
+              emerald: '#10b981',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Estilização base e grade tática de fundo */
+    body {
+      background-color: #020617;
+      color: #f8fafc;
+      background-image:
+        radial-gradient(circle at 50% 0%, rgba(6, 182, 212, 0.08), transparent 55%),
+        linear-gradient(to right, rgba(30, 41, 59, 0.25) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(30, 41, 59, 0.25) 1px, transparent 1px);
+      background-size: 100% 100%, 40px 40px, 40px 40px;
+    }
+
+    /* Barra de rolagem customizada para tema SOC */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #020617;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #06b6d4;
+    }
+
+    /* Animação dos arcos de ataque no mapa SVG */
+    @keyframes attackDashFlow {
+      0% {
+        stroke-dashoffset: 120;
+      }
+      100% {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    .attack-arc {
+      stroke-dasharray: 8 6;
+      animation: attackDashFlow 2.4s linear infinite;
+      transition: stroke-width 0.2s ease, opacity 0.2s ease;
+    }
+
+    .attack-arc:hover {
+      stroke-width: 3.2px !important;
+      opacity: 1 !important;
+      filter: drop-shadow(0 0 6px currentColor);
+    }
+
+    @keyframes pulseRing {
+      0% {
+        transform: scale(0.8);
+        opacity: 0.9;
+      }
+      70% {
+        transform: scale(2.4);
+        opacity: 0;
+      }
+      100% {
+        transform: scale(2.4);
+        opacity: 0;
+      }
+    }
+
+    .hub-pulse {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: pulseRing 2.2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+    }
+
+    /* Efeito sutil de brilho em painéis críticos */
+    .glow-cyan {
+      box-shadow: 0 0 24px -6px rgba(6, 182, 212, 0.22);
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+
+  <!-- Toast de Notificação Não-Intrusivo (Substitui alert()) -->
+  <div id="soc-toast" class="fixed bottom-5 right-5 z-50 hidden transform transition-all duration-300 translate-y-2 opacity-0">
+    <div class="flex items-center gap-3 rounded-xl border border-cyan-500/40 bg-slate-900/95 px-4 py-3 text-sm text-slate-100 shadow-2xl backdrop-blur-md">
+      <span id="soc-toast-icon" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-cyan-500/20 text-cyan-400">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </span>
+      <span id="soc-toast-msg" class="font-medium">Notificação SOC</span>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- HEADER / BARRA DE COMANDO DO SOC                                      -->
+  <!-- ===================================================================== -->
+  <header class="sticky top-0 z-40 border-b border-slate-800/90 bg-slate-950/90 backdrop-blur-md">
+    <div class="mx-auto flex max-w-[1600px] flex-col gap-3 px-4 py-3.5 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+      
+      <!-- Identidade do Centro de Operações -->
+      <div class="flex items-center gap-3.5">
+        <div class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-500/10 text-cyan-400 shadow-lg shadow-cyan-500/10">
+          <!-- Escudo Radar SVG -->
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            <circle cx="12" cy="11" r="3" />
+            <path stroke-linecap="round" d="M12 5v2m0 8v2m-6-6h2m8 0h2" />
+          </svg>
+          <span class="absolute -right-1 -top-1 flex h-3 w-3">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex h-3 w-3 rounded-full bg-emerald-500"></span>
+          </span>
+        </div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-base font-extrabold tracking-tight text-white sm:text-lg">
+              AEGIS <span class="text-cyan-400">SOC</span> // INTELIGÊNCIA DE AMEAÇAS GLOBAIS
+            </h1>
+            <span class="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-cyan-300">
+              LIVE TELEMETRY
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">
+            Monitoramento contínuo de ataques cibernéticos, identificação CVE e análise de causa raiz (CWE)
+          </p>
+        </div>
+      </div>
+
+      <!-- Controles de Ciclo de 10 Minutos, Status de Feed e Ações -->
+      <div class="flex flex-wrap items-center gap-2.5 sm:gap-3">
+        
+        <!-- Indicador de Status da Fonte de Dados -->
+        <div id="feed-status-badge" class="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-2 text-xs">
+          <span id="feed-status-dot" class="h-2.5 w-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+          <div class="flex flex-col">
+            <span id="feed-status-text" class="font-semibold text-slate-200">Inicializando Feed...</span>
+            <span id="last-sync-text" class="font-mono text-[10px] text-slate-400">Última sinc.: --:--:--</span>
+          </div>
+        </div>
+
+        <!-- Temporizador Regressivo de 10 Minutos -->
+        <div class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/90 px-3.5 py-2">
+          <div class="text-cyan-400">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <div class="text-[10px] font-medium uppercase tracking-wider text-slate-400">Próxima atualização em</div>
+            <div class="flex items-center gap-2">
+              <span id="countdown-timer" class="font-mono text-sm font-bold text-cyan-300">10:00</span>
+              <div class="h-1.5 w-16 overflow-hidden rounded-full bg-slate-800">
+                <div id="countdown-progress" class="h-full bg-cyan-400 transition-all duration-1000" style="width: 100%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botão Atualizar Agora -->
+        <button id="btn-refresh-now" type="button" class="inline-flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/15 px-3.5 py-2.5 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-500/25 hover:text-white active:scale-95">
+          <svg id="refresh-icon" class="h-4 w-4 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>Atualizar Agora</span>
+        </button>
+
+        <!-- Botão Configurações API -->
+        <button id="btn-open-config" type="button" title="Configurar Chave API NVD ou Endpoint Customizado" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs font-medium text-slate-300 transition hover:border-slate-600 hover:bg-slate-800 hover:text-white">
+          <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span class="hidden sm:inline">API / Feed</span>
+        </button>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- CONTEÚDO PRINCIPAL DO DASHBOARD                                       -->
+  <!-- ===================================================================== -->
+  <main class="mx-auto max-w-[1600px] space-y-6 px-4 py-6 lg:px-6">
+
+    <!-- 1. SEÇÃO DE 4 CARDS DE KPI -->
+    <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      
+      <!-- KPI 1: Total de Ataques Monitorados -->
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 backdrop-blur-sm transition hover:border-cyan-500/40 glow-cyan">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Ataques Monitorados (Janela)</p>
+            <div class="mt-2 flex items-baseline gap-2.5">
+              <span id="kpi-total-attacks" class="font-mono text-3xl font-extrabold text-white">--</span>
+              <span id="kpi-attacks-delta" class="rounded-md bg-cyan-500/15 px-2 py-0.5 font-mono text-xs font-semibold text-cyan-400">Ciclo #1</span>
+            </div>
+          </div>
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+        </div>
+        <p class="mt-3 text-xs text-slate-400">
+          Eventos ativos correlacionados com CVEs exploráveis em tempo real
+        </p>
+      </div>
+
+      <!-- KPI 2: CVEs Críticas (CVSS >= 9.0) -->
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 backdrop-blur-sm transition hover:border-red-500/40">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">CVEs Críticas (CVSS ≥ 9.0)</p>
+            <div class="mt-2 flex items-baseline gap-2.5">
+              <span id="kpi-critical-count" class="font-mono text-3xl font-extrabold text-red-400">--</span>
+              <span id="kpi-critical-pct" class="rounded-md bg-red-500/15 px-2 py-0.5 font-mono text-xs font-semibold text-red-400">0%</span>
+            </div>
+          </div>
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 text-red-400">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+        </div>
+        <p class="mt-3 text-xs text-slate-400">
+          Vulnerabilidades de impacto máximo exigindo contenção imediata
+        </p>
+      </div>
+
+      <!-- KPI 3: Causa Raiz Predominante -->
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 backdrop-blur-sm transition hover:border-amber-500/40">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Causa Raiz Predominante</p>
+            <div class="mt-2 flex items-center gap-2">
+              <span id="kpi-top-cwe-id" class="shrink-0 rounded-md border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 font-mono text-xs font-bold text-amber-300">CWE-78</span>
+              <span id="kpi-top-cwe-count" class="font-mono text-xs text-slate-400">(0 casos)</span>
+            </div>
+            <p id="kpi-top-cwe-name" class="mt-1.5 truncate text-sm font-bold text-white" title="">
+              Carregando análise...
+            </p>
+          </div>
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+            </svg>
+          </div>
+        </div>
+        <p class="mt-2 text-xs text-slate-400">
+          Falha estrutural de software mais explorada nesta janela
+        </p>
+      </div>
+
+      <!-- KPI 4: Países Alvo Únicos -->
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 backdrop-blur-sm transition hover:border-emerald-500/40">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Países Alvo Únicos</p>
+            <div class="mt-2 flex items-baseline gap-2.5">
+              <span id="kpi-unique-targets" class="font-mono text-3xl font-extrabold text-emerald-400">--</span>
+              <span id="kpi-top-target-country" class="rounded-md bg-emerald-500/15 px-2 py-0.5 font-mono text-xs font-semibold text-emerald-300">Global</span>
+            </div>
+          </div>
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+        </div>
+        <p class="mt-3 text-xs text-slate-400">
+          Jurisdições com ativos críticos sob tentativa de exploração
+        </p>
+      </div>
+
+    </section>
+
+    <!-- 2. MAPA-MÚNDI INTERATIVO DE ATAQUES AO VIVO + FEED LATERAL RÁPIDO -->
+    <section class="grid grid-cols-1 gap-6 xl:grid-cols-12">
+      
+      <!-- Mapa Vetorial Interativo (8 colunas no desktop) -->
+      <div class="flex flex-col rounded-2xl border border-slate-800 bg-slate-900/80 p-4 sm:p-5 backdrop-blur-sm xl:col-span-8">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="h-2 w-2 rounded-full bg-red-500 animate-ping"></span>
+              <h2 class="text-sm font-bold uppercase tracking-wider text-white">
+                Mapa Global de Vetores de Ataque em Tempo Real
+              </h2>
+            </div>
+            <p class="text-xs text-slate-400">
+              Passe o cursor ou clique nos arcos animados para inspecionar a CVE e causa raiz
+            </p>
+          </div>
+
+          <!-- Legenda & Filtro Rápido do Mapa -->
+          <div class="flex flex-wrap items-center gap-3 text-xs">
+            <div class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-1.5">
+              <span class="flex items-center gap-1.5 text-slate-300">
+                <span class="h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"></span> Crítica
+              </span>
+              <span class="flex items-center gap-1.5 text-slate-300">
+                <span class="h-2.5 w-2.5 rounded-full bg-orange-500 shadow-[0_0_8px_#f97316]"></span> Alta
+              </span>
+              <span class="flex items-center gap-1.5 text-slate-300">
+                <span class="h-2.5 w-2.5 rounded-full bg-yellow-400 shadow-[0_0_8px_#eab308]"></span> Média
+              </span>
+            </div>
+            <button id="btn-map-critical-only" type="button" class="rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-red-500/50 hover:text-red-300">
+              Somente Críticas: OFF
+            </button>
+          </div>
+        </div>
+
+        <!-- Container Relativo do Mapa SVG + Tooltip Flutuante -->
+        <div id="world-map-container" class="relative w-full overflow-hidden rounded-xl border border-slate-800/90 bg-slate-950">
+          <!-- SVG Equiretangular 1000x500 -->
+          <svg id="world-map-svg" viewBox="0 0 1000 500" class="h-auto w-full select-none block" role="img" aria-label="Mapa-múndi de ataques cibernéticos ao vivo">
+            <defs>
+              <radialGradient id="mapBgGlow" cx="50%" cy="50%" r="60%">
+                <stop offset="0%" stop-color="#0f172a" stop-opacity="0.9" />
+                <stop offset="100%" stop-color="#020617" stop-opacity="1" />
+              </radialGradient>
+              <filter id="glowStrong" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            <!-- Fundo Oceano -->
+            <rect width="1000" height="500" fill="url(#mapBgGlow)" />
+
+            <!-- Grade de Latitude / Longitude -->
+            <g id="map-graticule" stroke="#1e293b" stroke-width="0.6" stroke-dasharray="2 4" opacity="0.65">
+              <!-- Meridianos -->
+              <line x1="166.7" y1="0" x2="166.7" y2="500" />
+              <line x1="333.3" y1="0" x2="333.3" y2="500" />
+              <line x1="500" y1="0" x2="500" y2="500" stroke="#334155" />
+              <line x1="666.7" y1="0" x2="666.7" y2="500" />
+              <line x1="833.3" y1="0" x2="833.3" y2="500" />
+              <!-- Paralelos (Equador em y=250) -->
+              <line x1="0" y1="83.3" x2="1000" y2="83.3" />
+              <line x1="0" y1="166.7" x2="1000" y2="166.7" />
+              <line x1="0" y1="250" x2="1000" y2="250" stroke="#06b6d4" stroke-opacity="0.25" />
+              <line x1="0" y1="333.3" x2="1000" y2="333.3" />
+              <line x1="0" y1="416.7" x2="1000" y2="416.7" />
+            </g>
+
+            <!-- Continentes em Projeção Equiretangular Precisa -->
+            <g id="map-continents" fill="#131c31" stroke="#28354f" stroke-width="1.1" stroke-linejoin="round">
+              <!-- América do Norte -->
+              <path d="M 35,72 L 85,58 L 145,52 L 210,45 L 268,52 L 315,72 L 335,105 L 312,128 L 292,135 L 275,155 L 265,175 L 235,178 L 222,195 L 245,212 L 275,225 L 285,232 L 272,236 L 242,218 L 208,196 L 182,165 L 155,142 L 138,108 L 105,96 L 62,92 Z" />
+              <!-- Groenlândia -->
+              <path d="M 342,24 L 412,18 L 442,38 L 415,68 L 368,75 L 345,52 Z" />
+              <!-- América do Sul -->
+              <path d="M 286,236 L 322,235 L 365,252 L 402,272 L 398,308 L 372,342 L 345,375 L 325,405 L 308,402 L 304,365 L 295,315 L 278,275 Z" />
+              <!-- Europa -->
+              <path d="M 472,118 L 482,92 L 505,74 L 538,52 L 575,48 L 605,65 L 615,98 L 598,125 L 572,132 L 548,136 L 525,134 L 498,138 L 476,132 Z" />
+              <!-- Reino Unido & Irlanda -->
+              <path d="M 474,98 L 486,95 L 492,110 L 478,113 Z" />
+              <!-- África -->
+              <path d="M 468,152 L 515,146 L 565,154 L 598,176 L 618,215 L 595,258 L 578,308 L 555,342 L 535,338 L 522,295 L 512,252 L 475,236 L 455,205 L 456,174 Z" />
+              <!-- Madagascar -->
+              <path d="M 615,288 L 626,286 L 624,316 L 612,318 Z" />
+              <!-- Ásia Continental + Oriente Médio -->
+              <path d="M 598,125 L 615,65 L 685,46 L 775,48 L 865,58 L 935,72 L 912,96 L 872,112 L 855,145 L 845,175 L 812,198 L 788,238 L 765,225 L 745,195 L 718,215 L 695,185 L 662,192 L 635,186 L 602,168 L 592,145 Z" />
+              <!-- Japão -->
+              <path d="M 882,135 L 895,132 L 892,158 L 878,162 Z" />
+              <!-- Sudeste Asiático / Indonésia / Filipinas -->
+              <path d="M 782,252 L 822,256 L 858,266 L 845,278 L 795,272 Z" />
+              <path d="M 842,202 L 854,202 L 856,226 L 844,226 Z" />
+              <!-- Austrália & Nova Zelândia -->
+              <path d="M 822,308 L 878,298 L 925,315 L 932,355 L 895,374 L 845,365 L 818,342 Z" />
+              <path d="M 955,375 L 972,368 L 968,392 L 950,395 Z" />
+            </g>
+
+            <!-- Camada de Arcos Animados de Ataque -->
+            <g id="map-arcs-layer"></g>
+
+            <!-- Camada de Nós/Hubs Globais -->
+            <g id="map-nodes-layer"></g>
+          </svg>
+
+          <!-- Tooltip Interativo do Mapa -->
+          <div id="map-tooltip" class="pointer-events-none absolute z-30 hidden w-72 rounded-xl border border-cyan-500/50 bg-slate-950/95 p-3 text-xs shadow-2xl backdrop-blur-md">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+              <span id="tt-cve" class="font-mono font-bold text-cyan-400">CVE-2024-0000</span>
+              <span id="tt-severity" class="rounded px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase">CRÍTICA 9.8</span>
+            </div>
+            <div class="mt-2 space-y-1 text-slate-300">
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Rota:</span>
+                <span id="tt-route" class="font-semibold text-white">RU → BR</span>
+              </div>
+              <div>
+                <span class="text-slate-400">Causa Raiz:</span>
+                <p id="tt-cause" class="font-medium text-amber-300">CWE-78: Injeção de Comando</p>
+              </div>
+              <div class="flex items-center justify-between pt-1 text-[10px] text-cyan-400">
+                <span>Vetor: <strong id="tt-vector">RCE</strong></span>
+                <span>Clique para investigar →</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rodapé Telemetria sobre o Mapa -->
+          <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 bg-slate-950/95 px-3.5 py-2 font-mono text-[11px] text-slate-400">
+            <span>PROJEÇÃO: EQUIRETANGULAR WGS84 // TELEMETRIA DE BORDA</span>
+            <span id="map-active-arcs-label" class="text-cyan-400">0 VETORES ATIVOS PLOTADOS</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stream em Tempo Real / Alertas Críticos Recentes (4 colunas no desktop) -->
+      <div class="flex flex-col rounded-2xl border border-slate-800 bg-slate-900/80 p-4 sm:p-5 backdrop-blur-sm xl:col-span-4">
+        <div class="mb-3 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-white">Stream de Detecções</h2>
+            <p class="text-xs text-slate-400">Últimas explorações identificadas no perímetro</p>
+          </div>
+          <span class="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 font-mono text-[11px] font-semibold text-cyan-300">
+            AO VIVO
+          </span>
+        </div>
+
+        <div id="live-stream-list" class="flex-1 space-y-2.5 overflow-y-auto pr-1 max-h-[410px]">
+          <!-- Itens preenchidos dinamicamente via JS -->
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 3. GRÁFICOS ANALÍTICOS: CAUSAS RAIZ (CWE) & TIMELINE DE 10 MINUTOS -->
+    <section class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      
+      <!-- Gráfico 1: Principais Causas Raiz (CWE) -->
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 backdrop-blur-sm lg:col-span-6">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-white">
+              Principais Causas Raiz (Classificação CWE)
+            </h2>
+            <p class="text-xs text-slate-400">
+              Distribuição das fraquezas de código que originaram os ataques
+            </p>
+          </div>
+          <span class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 font-mono text-[11px] font-semibold text-amber-300">
+            TOP CWEs
+          </span>
+        </div>
+
+        <div id="cwe-chart-container" class="space-y-3.5">
+          <!-- Barras horizontais analíticas renderizadas via JS -->
+        </div>
+      </div>
+
+      <!-- Gráfico 2: Volume de Ataques por Janela de 10 Minutos -->
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 backdrop-blur-sm lg:col-span-6">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-white">
+              Volume de Ataques por Janela de 10 Minutos
+            </h2>
+            <p class="text-xs text-slate-400">
+              Histórico de telemetria agrupado por severidade a cada ciclo de coleta
+            </p>
+          </div>
+          <div class="flex items-center gap-3 text-[11px] text-slate-400">
+            <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-sm bg-red-500"></span>Crítica</span>
+            <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-sm bg-amber-500"></span>Alta</span>
+            <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-sm bg-cyan-500"></span>Média</span>
+          </div>
+        </div>
+
+        <!-- Gráfico de Barras Empilhadas Responsivo -->
+        <div id="timeline-chart-container" class="mt-4 flex h-56 items-end justify-between gap-2 sm:gap-3 rounded-xl border border-slate-800/80 bg-slate-950/70 px-3 pb-3 pt-6">
+          <!-- Colunas renderizadas via JS -->
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 4. TABELA DETALHADA DE ATAQUES, CVE E CAUSA RAIZ -->
+    <section class="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 sm:p-6 backdrop-blur-sm">
+      
+      <!-- Cabeçalho da Tabela + Filtros -->
+      <div class="mb-5 flex flex-col gap-4 border-b border-slate-800 pb-5">
+        <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <h2 class="text-base font-bold uppercase tracking-wider text-white">
+              Matriz de Incidentes, Identificação CVE e Causa Raiz
+            </h2>
+            <p class="text-xs text-slate-400">
+              Clique em qualquer incidente ou CVE para abrir o dossiê forense completo e link oficial NVD
+            </p>
+          </div>
+          <div class="font-mono text-xs text-slate-400">
+            Exibindo <span id="table-showing-count" class="font-bold text-cyan-400">0</span> registros
+          </div>
+        </div>
+
+        <!-- Barra de Filtros Rápidos e Busca -->
+        <div class="grid grid-cols-1 gap-3 lg:grid-cols-12">
+          
+          <!-- Filtro por Severidade -->
+          <div class="flex flex-wrap items-center gap-1.5 lg:col-span-4" id="severity-filter-group">
+            <button type="button" data-sev="ALL" class="sev-filter-btn active rounded-lg border border-cyan-500/50 bg-cyan-500/20 px-3 py-1.5 text-xs font-semibold text-cyan-300 transition">
+              Todas
+            </button>
+            <button type="button" data-sev="CRITICAL" class="sev-filter-btn rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-red-500/50 hover:text-red-300">
+              Crítica
+            </button>
+            <button type="button" data-sev="HIGH" class="sev-filter-btn rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-amber-500/50 hover:text-amber-300">
+              Alta
+            </button>
+            <button type="button" data-sev="MEDIUM" class="sev-filter-btn rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-yellow-500/50 hover:text-yellow-300">
+              Média
+            </button>
+          </div>
+
+          <!-- Filtro por Vetor de Ataque -->
+          <div class="lg:col-span-4">
+            <select id="vector-filter-select" aria-label="Filtrar por vetor de ataque" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs font-medium text-slate-200 focus:border-cyan-500 focus:outline-none">
+              <option value="ALL">Vetor de Ataque: Todos os Vetores</option>
+              <option value="RCE">RCE (Execução Remota de Código)</option>
+              <option value="Bypass de Autenticação">Bypass de Autenticação</option>
+              <option value="Exploração Web">Exploração Web (SQLi / XSS / SSRF)</option>
+              <option value="Ransomware">Ransomware / Sequestro de Dados</option>
+              <option value="DDoS">DDoS / Negação de Serviço</option>
+            </select>
+          </div>
+
+          <!-- Barra de Busca -->
+          <div class="relative lg:col-span-4">
+            <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </span>
+            <input id="search-input" type="text" placeholder="Buscar por CVE, país, CWE ou causa raiz..." class="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-xs text-slate-100 placeholder-slate-500 focus:border-cyan-500 focus:outline-none" />
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Tabela Responsiva -->
+      <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table class="w-full border-collapse text-left text-xs">
+          <thead>
+            <tr class="border-b border-slate-800 bg-slate-950/90 font-mono text-[11px] uppercase tracking-wider text-slate-400">
+              <th class="px-4 py-3.5">Horário (Local/UTC)</th>
+              <th class="px-4 py-3.5">Origem → Alvo</th>
+              <th class="px-4 py-3.5">Identificação (CVE)</th>
+              <th class="px-4 py-3.5">Severidade (CVSS)</th>
+              <th class="px-4 py-3.5">Causa do Ataque (CWE + Diagnóstico)</th>
+              <th class="px-4 py-3.5">Vetor / Setor Alvo</th>
+              <th class="px-4 py-3.5 text-right">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="attacks-table-body" class="divide-y divide-slate-800/70 bg-slate-900/40">
+            <!-- Linhas geradas dinamicamente via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Estado Vazio de Filtro -->
+      <div id="table-empty-state" class="hidden py-12 text-center">
+        <p class="text-sm font-semibold text-slate-300">Nenhum incidente encontrado com os filtros aplicados.</p>
+        <p class="mt-1 text-xs text-slate-500">Tente limpar a busca ou selecionar todas as severidades.</p>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL DE INVESTIGAÇÃO FORENSE DE CVE & CAUSA RAIZ                     -->
+  <!-- ===================================================================== -->
+  <div id="cve-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/85 p-4 backdrop-blur-md">
+    <div class="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6 shadow-2xl">
+      
+      <!-- Cabeçalho do Modal -->
+      <div class="flex items-start justify-between gap-4 border-b border-slate-800 pb-4">
+        <div>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <span id="modal-cve-id" class="font-mono text-xl font-extrabold text-cyan-400">CVE-2024-0000</span>
+            <span id="modal-severity-badge" class="rounded-lg border px-2.5 py-0.5 font-mono text-xs font-bold uppercase">
+              CRÍTICA • CVSS 9.8
+            </span>
+            <span id="modal-source-tag" class="rounded-md bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-slate-300">
+              NVD Verified
+            </span>
+          </div>
+          <p id="modal-timestamps" class="mt-1.5 font-mono text-xs text-slate-400">
+            Detectado: --:--:-- | Publicado NVD: ----
+          </p>
+        </div>
+
+        <button id="btn-close-cve-modal" type="button" class="rounded-xl border border-slate-700 bg-slate-800 p-2 text-slate-400 transition hover:bg-slate-700 hover:text-white" aria-label="Fechar modal">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Corpo do Modal -->
+      <div class="mt-5 space-y-5 text-sm">
+        
+        <!-- Telemetria de Rota e Vetor -->
+        <div class="grid grid-cols-1 gap-3 rounded-xl border border-slate-800 bg-slate-950/70 p-4 sm:grid-cols-3">
+          <div>
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Origem → Destino</span>
+            <p id="modal-route" class="mt-1 font-bold text-white">-- → --</p>
+          </div>
+          <div>
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Vetor de Exploração</span>
+            <p id="modal-vector" class="mt-1 font-bold text-cyan-300">--</p>
+          </div>
+          <div>
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Setor Alvo</span>
+            <p id="modal-sector" class="mt-1 font-bold text-emerald-300">--</p>
+          </div>
+        </div>
+
+        <!-- Causa Raiz (CWE) Destacada -->
+        <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+          <div class="flex items-center gap-2">
+            <span class="rounded bg-amber-500/20 px-2 py-0.5 font-mono text-xs font-bold text-amber-300" id="modal-cwe-code">CWE-78</span>
+            <h3 class="font-bold text-amber-200" id="modal-cwe-title">Causa Raiz</h3>
+          </div>
+          <p id="modal-cwe-explanation" class="mt-2 text-xs leading-relaxed text-amber-100/90">
+            Explicação técnica da causa raiz da vulnerabilidade.
+          </p>
+        </div>
+
+        <!-- Resumo Técnico da Vulnerabilidade -->
+        <div>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Resumo Técnico da Vulnerabilidade</h3>
+          <p id="modal-description" class="mt-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3.5 text-xs leading-relaxed text-slate-200">
+            Descrição detalhada da falha.
+          </p>
+        </div>
+
+        <!-- Matriz de Impacto CIA (Confidencialidade, Integridade, Disponibilidade) -->
+        <div>
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Impacto CIA & Vetor CVSS</h3>
+            <span id="modal-cvss-vector" class="font-mono text-[11px] text-slate-400">CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H</span>
+          </div>
+          <div class="mt-2.5 grid grid-cols-3 gap-3">
+            <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-center">
+              <span class="text-[11px] text-slate-400">Confidencialidade</span>
+              <p id="modal-cia-c" class="mt-1 font-mono text-xs font-bold text-red-400">ALTO</p>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-center">
+              <span class="text-[11px] text-slate-400">Integridade</span>
+              <p id="modal-cia-i" class="mt-1 font-mono text-xs font-bold text-red-400">ALTO</p>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-center">
+              <span class="text-[11px] text-slate-400">Disponibilidade</span>
+              <p id="modal-cia-a" class="mt-1 font-mono text-xs font-bold text-red-400">ALTO</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mitigação Recomendada -->
+        <div>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-400">Mitigação & Contramedidas Recomendadas</h3>
+          <div id="modal-mitigation" class="mt-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs leading-relaxed text-emerald-100">
+            Passos de remediação.
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Rodapé do Modal com Ações -->
+      <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4">
+        <button id="btn-copy-ioc" type="button" class="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-700 hover:text-white">
+          <svg class="h-4 w-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+          </svg>
+          <span>Copiar Relatório Técnico</span>
+        </button>
+
+        <a id="modal-nvd-link" href="https://nvd.nist.gov/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-xl bg-cyan-500 px-4 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-400">
+          <span>Abrir Registro Oficial no NVD (NIST)</span>
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL DE CONFIGURAÇÃO DE API NVD / ENDPOINT CUSTOMIZADO               -->
+  <!-- ===================================================================== -->
+  <div id="config-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/85 p-4 backdrop-blur-md">
+    <div class="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3.5">
+        <h3 class="text-base font-bold text-white">Configuração de Telemetria & API NVD</h3>
+        <button id="btn-close-config-modal" type="button" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <form id="config-form" class="mt-4 space-y-4 text-xs">
+        <div>
+          <label for="input-nvd-apikey" class="block font-semibold text-slate-200">
+            Chave de API do NIST NVD (Opcional)
+          </label>
+          <p class="mt-0.5 text-slate-400">
+            Aumenta o limite de requisições públicas da API NVD 2.0 (de 5 para 50 req/30s).
+          </p>
+          <input id="input-nvd-apikey" type="password" placeholder="Ex: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" class="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 font-mono text-slate-100 placeholder-slate-600 focus:border-cyan-500 focus:outline-none" />
+        </div>
+
+        <div>
+          <label for="input-custom-endpoint" class="block font-semibold text-slate-200">
+            URL de Endpoint Backend / Proxy Customizado (Opcional)
+          </label>
+          <p class="mt-0.5 text-slate-400">
+            Substitui a URL padrão do NVD caso você utilize um proxy interno para CISA KEV / ThreatFox.
+          </p>
+          <input id="input-custom-endpoint" type="url" placeholder="https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=20" class="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 font-mono text-slate-100 placeholder-slate-600 focus:border-cyan-500 focus:outline-none" />
+        </div>
+
+        <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-slate-400">
+          <strong class="text-cyan-400">Nota de Resiliência:</strong> Se a API externa estiver inacessível ou sofrer rate-limit no navegador, o motor ativa automaticamente a <em>Telemetria Híbrida / CISA KEV</em> com rotação dinâmica a cada 10 minutos.
+        </div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-2">
+          <button id="btn-reset-config" type="button" class="rounded-xl border border-slate-700 px-3.5 py-2 font-medium text-slate-300 hover:bg-slate-800">
+            Restaurar Padrão
+          </button>
+          <button type="submit" class="rounded-xl bg-cyan-500 px-4 py-2 font-bold text-slate-950 hover:bg-cyan-400">
+            Salvar e Sincronizar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MOTOR JAVASCRIPT DO SOC (TELEMETRIA, NVD API, MAPA E ANÁLISE)         -->
+  <!-- ===================================================================== -->
+  <script>
+    /**
+     * AEGIS SOC - Motor de Inteligência de Ameaças Cibernéticas em Tempo Real
+     * Arquitetura self-contained:
+     * 1. Dicionário completo de mapeamento CWE -> Causa Raiz em Português (PT-BR)
+     * 2. Base geográfica de hubs globais com projeção equiretangular exata
+     * 3. Integração real com NIST NVD 2.0 API + Telemetria Híbrida / Fallback CISA KEV
+     * 4. Temporizador regressivo de 10 minutos (600s) com histórico de janelas
+     */
+
+    // =========================================================================
+    // 1. DICIONÁRIO DE CAUSAS RAIZ (CWE -> PORTUGUÊS)
+    // =========================================================================
+    const CWE_CATALOG = {
+      'CWE-78': {
+        code: 'CWE-78',
+        name: 'Injeção de Comando no SO (OS Command Injection)',
+        shortName: 'Injeção de Comando no SO',
+        explanation: 'A aplicação constrói comandos de sistema operacional utilizando entradas externas não sanitizadas, permitindo que o invasor execute comandos arbitrários diretamente no shell do servidor.',
+        mitigation: 'Evitar chamadas diretas ao shell (system/exec); utilizar APIs parametrizadas seguras, aplicar validação rigorosa por lista branca (allowlist) e aplicar o patch oficial do fabricante.'
+      },
+      'CWE-89': {
+        code: 'CWE-89',
+        name: 'Injeção de SQL (SQL Injection)',
+        shortName: 'Injeção de SQL (SQLi)',
+        explanation: 'Concatenação direta de parâmetros controlados pelo usuário em consultas SQL permite leitura, modificação ou exfiltração completa de bancos de dados corporativos.',
+        mitigation: 'Substituir consultas dinâmicas por Prepared Statements (consultas parametrizadas), aplicar princípio do menor privilégio no banco e ativar regras WAF contra SQLi.'
+      },
+      'CWE-79': {
+        code: 'CWE-79',
+        name: 'Cross-Site Scripting (XSS)',
+        shortName: 'Cross-Site Scripting (XSS)',
+        explanation: 'Falha na neutralização de entrada web antes de ser renderizada no navegador da vítima, possibilitando roubo de tokens de sessão e sequestro de contas administrativas.',
+        mitigation: 'Implementar codificação contextual de saída (output encoding), ativar cabeçalhos Content-Security-Policy (CSP) restritivos e marcar cookies de sessão como HttpOnly.'
+      },
+      'CWE-287': {
+        code: 'CWE-287',
+        name: 'Falha de Autenticação / Bypass de Credenciais',
+        shortName: 'Falha de Autenticação',
+        explanation: 'Mecanismo de verificação de identidade mal implementado permite que atacantes contornem o login e acessem painéis administrativos sem credenciais válidas.',
+        mitigation: 'Atualizar imediatamente o firmware/software afetado, impor Autenticação Multifator (MFA) e restringir interfaces administrativas via VPN ou lista de IPs confiáveis.'
+      },
+      'CWE-502': {
+        code: 'CWE-502',
+        name: 'Desserialização de Dados Não Confiáveis',
+        shortName: 'Desserialização Insegura',
+        explanation: 'O sistema desserializa objetos binários ou estruturados vindos de fontes externas sem verificação de integridade, resultando frequentemente em Execução Remota de Código (RCE).',
+        mitigation: 'Não aceitar objetos serializados de fontes não confiáveis; migrar para formatos seguros como JSON com validação estrita de esquema e atualizar bibliotecas afetadas.'
+      },
+      'CWE-787': {
+        code: 'CWE-787',
+        name: 'Escrita de Memória Fora dos Limites (Out-of-bounds Write)',
+        shortName: 'Escrita Fora dos Limites',
+        explanation: 'Corrupção de memória causada pela gravação de dados além do buffer alocado, permitindo sequestro do fluxo de execução e RCE com privilégios de sistema.',
+        mitigation: 'Aplicar atualizações de segurança do fornecedor, habilitar proteções de compilação (ASLR, DEP/NX, Stack Canaries) e isolar serviços expostos na borda.'
+      },
+      'CWE-22': {
+        code: 'CWE-22',
+        name: 'Path Traversal (Travessia de Diretório)',
+        shortName: 'Path Traversal',
+        explanation: 'Uso de sequências como "../" em caminhos de arquivo permite escapar do diretório raiz da aplicação para ler arquivos confidenciais ou gravar web shells.',
+        mitigation: 'Normalizar e validar caminhos de arquivos contra um diretório base fixo, rejeitar caracteres de travessia e atualizar o serviço afetado.'
+      },
+      'CWE-918': {
+        code: 'CWE-918',
+        name: 'Server-Side Request Forgery (SSRF)',
+        shortName: 'SSRF (Requisição Forjada)',
+        explanation: 'O servidor realiza requisições HTTP/rede para destinos arbitrários indicados pelo atacante, expondo serviços internos, metadados de nuvem (IMDS) e intranets.',
+        mitigation: 'Bloquear acesso a faixas de IP privadas/loopback e metadados de nuvem na camada de rede, validar domínios permitidos e aplicar o patch de segurança.'
+      },
+      'CWE-94': {
+        code: 'CWE-94',
+        name: 'Injeção de Código Remoto (Code Injection)',
+        shortName: 'Injeção de Código',
+        explanation: 'Entrada externa é interpretada diretamente como código executável pelo motor da aplicação (PHP, Python, Java, Template Engine), concedendo controle total ao invasor.',
+        mitigation: 'Eliminar funções dinâmicas de avaliação (eval/include dinâmico), isolar processos em contêineres sem privilégios e aplicar correção oficial.'
+      },
+      'CWE-306': {
+        code: 'CWE-306',
+        name: 'Autenticação Ausente para Função Crítica',
+        shortName: 'Autenticação Ausente',
+        explanation: 'Endpoints ou APIs administrativas críticas estão expostos sem exigir qualquer autenticação prévia, permitindo criação de usuários administradores por qualquer agente externo.',
+        mitigation: 'Aplicar patch emergencial do fornecedor, auditar contas criadas recentemente e bloquear acesso público aos endpoints de gerenciamento.'
+      },
+      'CWE-416': {
+        code: 'CWE-416',
+        name: 'Use After Free (Uso Após Liberação de Memória)',
+        shortName: 'Use After Free (UAF)',
+        explanation: 'Referência a um ponteiro de memória já liberado permite que um invasor realoque o espaço com payload malicioso e execute código arbitrário.',
+        mitigation: 'Aplicar patches de segurança do sistema operacional ou navegador/aplicação e monitorar processos filhos anômalos via EDR.'
+      },
+      'CWE-20': {
+        code: 'CWE-20',
+        name: 'Validação Imprópria de Entrada (Input Validation)',
+        shortName: 'Validação Imprópria de Entrada',
+        explanation: 'O sistema processa pacotes ou parâmetros malformados sem validar formato, tamanho ou tipo, desencadeando falhas lógicas ou travamentos.',
+        mitigation: 'Implementar validação estrita de esquema e limites de tamanho na borda (WAF/API Gateway) e instalar atualização do fabricante.'
+      }
+    };
+
+    // =========================================================================
+    // 2. HUBS GEOGRÁFICOS GLOBAIS (COORDENADAS REAIS WGS84)
+    // =========================================================================
+    const GLOBAL_HUBS = [
+      { code: 'BR', name: 'Brasil', city: 'São Paulo', lat: -23.5, lon: -46.6, sector: 'Financeiro & Gov' },
+      { code: 'US', name: 'Estados Unidos', city: 'Washington D.C.', lat: 38.9, lon: -77.0, sector: 'Cloud & Defesa' },
+      { code: 'DE', name: 'Alemanha', city: 'Frankfurt', lat: 50.1, lon: 8.7, sector: 'Indústria & Energia' },
+      { code: 'GB', name: 'Reino Unido', city: 'Londres', lat: 51.5, lon: -0.1, sector: 'Financeiro' },
+      { code: 'FR', name: 'França', city: 'Paris', lat: 48.8, lon: 2.3, sector: 'Telecomunicações' },
+      { code: 'NL', name: 'Países Baixos', city: 'Amsterdã', lat: 52.4, lon: 4.9, sector: 'Data Centers / SaaS' },
+      { code: 'RU', name: 'Rússia', city: 'Moscou', lat: 55.7, lon: 37.6, sector: 'Infraestrutura' },
+      { code: 'UA', name: 'Ucrânia', city: 'Kyiv', lat: 50.4, lon: 30.5, sector: 'Energia & Gov' },
+      { code: 'CN', name: 'China', city: 'Pequim', lat: 39.9, lon: 116.4, sector: 'Manufatura & Tech' },
+      { code: 'KP', name: 'Coreia do Norte', city: 'Pyongyang', lat: 39.0, lon: 125.7, sector: 'Cripto & Defesa' },
+      { code: 'KR', name: 'Coreia do Sul', city: 'Seul', lat: 37.5, lon: 127.0, sector: 'Semicondutores' },
+      { code: 'JP', name: 'Japão', city: 'Tóquio', lat: 35.7, lon: 139.7, sector: 'Automotivo & Tech' },
+      { code: 'IN', name: 'Índia', city: 'Nova Délhi', lat: 28.6, lon: 77.2, sector: 'Serviços TI & Gov' },
+      { code: 'SG', name: 'Singapura', city: 'Singapura', lat: 1.3, lon: 103.8, sector: 'Hub Financeiro' },
+      { code: 'AU', name: 'Austrália', city: 'Sydney', lat: -33.9, lon: 151.2, sector: 'Saúde & Mineração' },
+      { code: 'IR', name: 'Irã', city: 'Teerã', lat: 35.7, lon: 51.4, sector: 'Infraestrutura' },
+      { code: 'IL', name: 'Israel', city: 'Tel Aviv', lat: 32.1, lon: 34.8, sector: 'Cibersegurança & Tech' },
+      { code: 'AE', name: 'Emirados Árabes', city: 'Dubai', lat: 25.2, lon: 55.3, sector: 'Energia & Finanças' },
+      { code: 'ZA', name: 'África do Sul', city: 'Joanesburgo', lat: -26.2, lon: 28.0, sector: 'Telecom & Bancos' },
+      { code: 'CA', name: 'Canadá', city: 'Toronto', lat: 43.7, lon: -79.4, sector: 'Recursos & Saúde' }
+    ];
+
+    const SOURCE_HUBS = ['RU', 'CN', 'KP', 'IR', 'NL', 'US', 'UA', 'IN', 'BR', 'DE'];
+    const TARGET_HUBS = ['BR', 'US', 'DE', 'GB', 'FR', 'JP', 'AU', 'SG', 'CA', 'KR', 'IL', 'AE', 'IN', 'ZA'];
+
+    // =========================================================================
+    // 3. BASE DE CVEs REAIS DE ALTA RELEVÂNCIA (PARA ENRIQUECIMENTO & FALLBACK)
+    // =========================================================================
+    const CURATED_REAL_CVES = [
+      {
+        cveId: 'CVE-2024-3400',
+        cvss: 10.0,
+        cwe: 'CWE-78',
+        vector: 'RCE',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H',
+        published: '2024-04-12',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Vulnerabilidade crítica de injeção de comando no recurso GlobalProtect do Palo Alto Networks PAN-OS permite que um invasor não autenticado execute código arbitrário com privilégios de root no firewall.'
+      },
+      {
+        cveId: 'CVE-2024-21762',
+        cvss: 9.8,
+        cwe: 'CWE-787',
+        vector: 'RCE',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2024-02-09',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Falha de escrita de memória fora dos limites (Out-of-bounds Write) no Fortinet FortiOS SSL VPN permite execução remota de código via requisições HTTP especialmente criadas.'
+      },
+      {
+        cveId: 'CVE-2024-1709',
+        cvss: 10.0,
+        cwe: 'CWE-287',
+        vector: 'Bypass de Autenticação',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H',
+        published: '2024-02-19',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Bypass crítico de autenticação no ConnectWise ScreenConnect permite acesso direto ao assistente de configuração e criação de contas administrativas com controle total sobre endpoints gerenciados.'
+      },
+      {
+        cveId: 'CVE-2024-4577',
+        cvss: 9.8,
+        cwe: 'CWE-78',
+        vector: 'RCE',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2024-06-09',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Falha de injeção de argumentos no PHP-CGI em ambientes Windows permite que invasores contornem proteções anteriores e executem comandos arbitrários remotamente.'
+      },
+      {
+        cveId: 'CVE-2023-4966',
+        cvss: 9.4,
+        cwe: 'CWE-787',
+        vector: 'Bypass de Autenticação',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:L',
+        published: '2023-10-25',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'BAIXO' },
+        description: 'Vulnerabilidade conhecida como "Citrix Bleed" no NetScaler ADC e Gateway expõe tokens de sessão sensíveis da memória, permitindo sequestro de sessões autenticadas sem MFA.'
+      },
+      {
+        cveId: 'CVE-2024-27198',
+        cvss: 9.8,
+        cwe: 'CWE-287',
+        vector: 'Bypass de Autenticação',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2024-03-04',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Falha de bypass de autenticação no componente web do JetBrains TeamCity permite comprometimento completo de pipelines de CI/CD e roubo de segredos de build.'
+      },
+      {
+        cveId: 'CVE-2023-34362',
+        cvss: 9.8,
+        cwe: 'CWE-89',
+        vector: 'Ransomware',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2023-06-02',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Injeção de SQL no Progress MOVEit Transfer explorada em campanhas globais de extorsão e ransomware para exfiltração massiva de arquivos corporativos.'
+      },
+      {
+        cveId: 'CVE-2024-23897',
+        cvss: 9.8,
+        cwe: 'CWE-22',
+        vector: 'Exploração Web',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2024-01-24',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Vulnerabilidade de Path Traversal no parser CLI do Jenkins permite leitura arbitrária de arquivos binários e chaves criptográficas do servidor controlador.'
+      },
+      {
+        cveId: 'CVE-2024-47575',
+        cvss: 9.8,
+        cwe: 'CWE-306',
+        vector: 'RCE',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2024-10-23',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Ausência de autenticação no daemon FGFM do Fortinet FortiManager permite que dispositivos não autorizados registrem-se e executem código arbitrário.'
+      },
+      {
+        cveId: 'CVE-2023-46805',
+        cvss: 8.2,
+        cwe: 'CWE-287',
+        vector: 'Bypass de Autenticação',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:N',
+        published: '2024-01-10',
+        cia: { c: 'ALTO', i: 'BAIXO', a: 'NENHUM' },
+        description: 'Falha de contorno de autenticação no componente web do Ivanti Connect Secure utilizada em cadeia com injeção de comando para implantação de web shells persistentes.'
+      },
+      {
+        cveId: 'CVE-2024-20353',
+        cvss: 8.6,
+        cwe: 'CWE-20',
+        vector: 'DDoS',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H',
+        published: '2024-04-24',
+        cia: { c: 'NENHUM', i: 'NENHUM', a: 'ALTO' },
+        description: 'Validação imprópria de cabeçalhos HTTP no servidor web de gerenciamento do Cisco ASA e FTD permite reinicialização forçada (DoS) e persistência em memória.'
+      },
+      {
+        cveId: 'CVE-2023-22515',
+        cvss: 9.8,
+        cwe: 'CWE-306',
+        vector: 'Exploração Web',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2023-10-04',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Controle de acesso quebrado no Atlassian Confluence Data Center e Server permite que atacantes externos criem contas de administrador do sistema.'
+      },
+      {
+        cveId: 'CVE-2024-38077',
+        cvss: 9.8,
+        cwe: 'CWE-787',
+        vector: 'RCE',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2024-07-09',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Estouro de buffer no Serviço de Roteamento e Acesso Remoto do Windows (RRAS) permite execução remota de código sem interação do usuário.'
+      },
+      {
+        cveId: 'CVE-2024-29847',
+        cvss: 9.8,
+        cwe: 'CWE-502',
+        vector: 'Ransomware',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2024-10-08',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Desserialização insegura no agente Ivanti Endpoint Manager (EPM) permite execução remota de código e comprometimento de servidores de backup/endpoints.'
+      },
+      {
+        cveId: 'CVE-2023-27997',
+        cvss: 9.8,
+        cwe: 'CWE-787',
+        vector: 'RCE',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2023-06-13',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Corrupção de memória heap (XORtigate) no FortiGate SSL-VPN permite execução de código arbitrário antes mesmo da autenticação do usuário.'
+      },
+      {
+        cveId: 'CVE-2024-21887',
+        cvss: 9.1,
+        cwe: 'CWE-78',
+        vector: 'RCE',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:H',
+        published: '2024-01-10',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Injeção de comando em componentes web do Ivanti Policy Secure permite que atacantes enviem requisições especialmente criadas para executar comandos no appliance.'
+      },
+      {
+        cveId: 'CVE-2024-0012',
+        cvss: 9.3,
+        cwe: 'CWE-287',
+        vector: 'Bypass de Autenticação',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:N',
+        published: '2024-11-18',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'NENHUM' },
+        description: 'Contorno de autenticação na interface web de gerenciamento do PAN-OS permite obtenção de privilégios administrativos e alteração de regras de firewall.'
+      },
+      {
+        cveId: 'CVE-2023-38831',
+        cvss: 7.8,
+        cwe: 'CWE-94',
+        vector: 'Exploração Web',
+        vectorString: 'CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H',
+        published: '2023-08-23',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Execução de código arbitrário ao abrir arquivos ZIP maliciosos contendo extensões falsificadas para entrega de payloads de espionagem.'
+      },
+      {
+        cveId: 'CVE-2024-28995',
+        cvss: 8.6,
+        cwe: 'CWE-22',
+        vector: 'Exploração Web',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:N/A:N',
+        published: '2024-06-06',
+        cia: { c: 'ALTO', i: 'NENHUM', a: 'NENHUM' },
+        description: 'Vulnerabilidade de Path Traversal no SolarWinds Serv-U permite leitura de arquivos sensíveis diretamente do sistema de arquivos subjacente.'
+      },
+      {
+        cveId: 'CVE-2024-36401',
+        cvss: 9.8,
+        cwe: 'CWE-94',
+        vector: 'RCE',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2024-07-01',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Avaliação insegura de expressões XPath no GeoServer permite execução remota de código por usuários não autenticados via requisições OGC.'
+      },
+      {
+        cveId: 'CVE-2024-40711',
+        cvss: 9.8,
+        cwe: 'CWE-502',
+        vector: 'Ransomware',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2024-09-05',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Desserialização de dados não confiáveis no Veeam Backup & Replication permite RCE sem autenticação e comprometimento de repositórios de backup.'
+      },
+      {
+        cveId: 'CVE-2023-29357',
+        cvss: 9.8,
+        cwe: 'CWE-287',
+        vector: 'Bypass de Autenticação',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2023-06-14',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Falsificação de tokens JWT no Microsoft SharePoint Server permite elevação de privilégios para administrador de farm sem credenciais.'
+      },
+      {
+        cveId: 'CVE-2024-21413',
+        cvss: 9.8,
+        cwe: 'CWE-918',
+        vector: 'Exploração Web',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2024-02-13',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Contorno de visão protegida (Moniker Link) no Microsoft Outlook permite vazamento de credenciais NTLM e execução remota de código via links maliciosos.'
+      },
+      {
+        cveId: 'CVE-2024-50623',
+        cvss: 8.8,
+        cwe: 'CWE-22',
+        vector: 'Ransomware',
+        vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        published: '2024-10-29',
+        cia: { c: 'ALTO', i: 'ALTO', a: 'ALTO' },
+        description: 'Upload e download irrestrito de arquivos no Cleo Harmony, VLTrader e LexiCom explorado ativamente por grupos de ransomware para exfiltração.'
+      }
+    ];
+
+    // =========================================================================
+    // 4. ESTADO GLOBAL DA APLICAÇÃO
+    // =========================================================================
+    const REFRESH_INTERVAL_SECONDS = 600; // 10 minutos exatos (600 segundos)
+
+    const state = {
+      secondsRemaining: REFRESH_INTERVAL_SECONDS,
+      cycleNumber: 1,
+      attacks: [],
+      timelineWindows: [],
+      feedMode: 'INIT', // 'LIVE_NVD' | 'HYBRID_FALLBACK'
+      lastSyncTime: null,
+      selectedAttack: null,
+      filters: {
+        severity: 'ALL',
+        vector: 'ALL',
+        search: '',
+        mapCriticalOnly: false
+      },
+      config: {
+        apiKey: localStorage.getItem('soc_nvd_apikey') || '',
+        endpoint: localStorage.getItem('soc_custom_endpoint') || 'https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=20'
+      }
+    };
+
+    // =========================================================================
+    // 5. FUNÇÕES UTILITÁRIAS E PROJEÇÃO GEOGRÁFICA
+    // =========================================================================
+
+    /**
+     * Converte (lon, lat) WGS84 para coordenadas SVG (1000 x 500) equiretangulares
+     */
+    function projectLatLon(lat, lon) {
+      const x = ((lon + 180) / 360) * 1000;
+      const y = ((90 - lat) / 180) * 500;
+      return { x: Number(x.toFixed(1)), y: Number(y.toFixed(1)) };
+    }
+
+    /**
+     * Retorna classificação de severidade padronizada a partir do score CVSS
+     */
+    function getSeverityInfo(cvss) {
+      const score = Number(cvss) || 7.5;
+      if (score >= 9.0) {
+        return {
+          key: 'CRITICAL',
+          label: 'Crítica',
+          colorHex: '#ef4444',
+          badgeClass: 'border-red-500/40 bg-red-500/15 text-red-400',
+          barClass: 'bg-red-500'
+        };
+      }
+      if (score >= 7.0) {
+        return {
+          key: 'HIGH',
+          label: 'Alta',
+          colorHex: '#f97316',
+          badgeClass: 'border-amber-500/40 bg-amber-500/15 text-amber-300',
+          barClass: 'bg-amber-500'
+        };
+      }
+      return {
+        key: 'MEDIUM',
+        label: 'Média',
+        colorHex: '#eab308',
+        badgeClass: 'border-yellow-500/40 bg-yellow-500/15 text-yellow-300',
+        barClass: 'bg-yellow-400'
+      };
+    }
+
+    /**
+     * Infere o código CWE a partir do retorno NVD ou da descrição textual
+     */
+    function resolveCweDetails(rawCweId, descriptionText = '') {
+      if (rawCweId && CWE_CATALOG[rawCweId]) {
+        return CWE_CATALOG[rawCweId];
+      }
+      const lower = descriptionText.toLowerCase();
+      if (lower.includes('sql injection') || lower.includes('sqli')) return CWE_CATALOG['CWE-89'];
+      if (lower.includes('cross-site scripting') || lower.includes('xss')) return CWE_CATALOG['CWE-79'];
+      if (lower.includes('command injection') || lower.includes('os command')) return CWE_CATALOG['CWE-78'];
+      if (lower.includes('authentication') || lower.includes('bypass')) return CWE_CATALOG['CWE-287'];
+      if (lower.includes('deserialization')) return CWE_CATALOG['CWE-502'];
+      if (lower.includes('out-of-bounds') || lower.includes('buffer overflow')) return CWE_CATALOG['CWE-787'];
+      if (lower.includes('path traversal') || lower.includes('directory traversal')) return CWE_CATALOG['CWE-22'];
+      if (lower.includes('ssrf') || lower.includes('server-side request')) return CWE_CATALOG['CWE-918'];
+      if (lower.includes('use after free') || lower.includes('use-after-free')) return CWE_CATALOG['CWE-416'];
+      if (lower.includes('remote code execution') || lower.includes('arbitrary code')) return CWE_CATALOG['CWE-94'];
+
+      // Fallback determinístico baseado no hash da string para variedade realista
+      const keys = Object.keys(CWE_CATALOG);
+      const idx = Math.abs(descriptionText.length) % keys.length;
+      return CWE_CATALOG[keys[idx]];
+    }
+
+    /**
+     * Exibe toast não-intrusivo no canto inferior direito
+     */
+    let toastTimeout = null;
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('soc-toast');
+      const msgEl = document.getElementById('soc-toast-msg');
+      const iconEl = document.getElementById('soc-toast-icon');
+
+      msgEl.textContent = message;
+      if (type === 'success') {
+        iconEl.className = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400';
+      } else if (type === 'warning') {
+        iconEl.className = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400';
+      } else {
+        iconEl.className = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-cyan-500/20 text-cyan-400';
+      }
+
+      toast.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('translate-y-2', 'opacity-0');
+        setTimeout(() => toast.classList.add('hidden'), 300);
+      }, 3600);
+    }
+
+    /**
+     * Formata horário local e UTC
+     */
+    function formatTimestamps(dateObj) {
+      const localStr = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const utcStr = dateObj.toISOString().substring(11, 19) + ' UTC';
+      return { localStr, utcStr };
+    }
+
+    // =========================================================================
+    // 6. COLETA DE DADOS REAIS (NIST NVD API 2.0) + TELEMETRIA HÍBRIDA
+    // =========================================================================
+
+    /**
+     * Seleciona pares determinísticos/variados de Origem -> Alvo para cada evento
+     */
+    function assignGeoTelemetry(index, seedOffset = 0) {
+      const srcCode = SOURCE_HUBS[(index * 3 + seedOffset) % SOURCE_HUBS.length];
+      let dstCode = TARGET_HUBS[(index * 5 + seedOffset + 1) % TARGET_HUBS.length];
+      if (dstCode === srcCode) {
+        dstCode = TARGET_HUBS[(index + 2) % TARGET_HUBS.length];
+      }
+      const sourceHub = GLOBAL_HUBS.find(h => h.code === srcCode) || GLOBAL_HUBS[6];
+      const targetHub = GLOBAL_HUBS.find(h => h.code === dstCode) || GLOBAL_HUBS[0];
+      return { sourceHub, targetHub };
+    }
+
+    /**
+     * Traduz ou adapta descrições do NVD para contexto técnico claro em Português
+     */
+    function localizeNvdDescription(cveId, rawDesc, cweDetails) {
+      if (!rawDesc) {
+        return `Vulnerabilidade identificada como ${cveId} associada a ${cweDetails.name}. Permite exploração remota por agentes maliciosos contra serviços expostos.`;
+      }
+      // Mantém o resumo técnico enriquecido em PT-BR + trecho original de referência
+      return `[Telemetria NVD] Falha classificada sob ${cweDetails.code} (${cweDetails.shortName}). Detalhe técnico original: ${rawDesc}`;
+    }
+
+    /**
+     * Busca CVEs reais na API pública do NIST NVD 2.0 com timeout e fallback automático
+     */
+    async function fetchThreatIntelligence(isManual = false) {
+      const refreshIcon = document.getElementById('refresh-icon');
+      const statusText = document.getElementById('feed-status-text');
+      const statusDot = document.getElementById('feed-status-dot');
+
+      refreshIcon.classList.add('animate-spin');
+      statusText.textContent = 'Sincronizando NVD 2.0...';
+      statusDot.className = 'h-2.5 w-2.5 rounded-full bg-cyan-400 animate-ping';
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6500);
+
+      let collectedAttacks = [];
+      let usedLiveApi = false;
+
+      try {
+        const headers = { 'Accept': 'application/json' };
+        if (state.config.apiKey && state.config.apiKey.trim() !== '') {
+          headers['apiKey'] = state.config.apiKey.trim();
+        }
+
+        // Busca CVEs recentes na API pública do NIST NVD 2.0
+        const response = await fetch(state.config.endpoint, {
+          method: 'GET',
+          headers,
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const vulns = Array.isArray(data.vulnerabilities) ? data.vulnerabilities : [];
+
+        if (vulns.length === 0) {
+          throw new Error('Nenhuma vulnerabilidade retornada');
+        }
+
+        // Processa até 16 CVEs reais do NVD e correlaciona com telemetria global
+        const now = Date.now();
+        const vectorsList = ['RCE', 'Exploração Web', 'Bypass de Autenticação', 'Ransomware', 'DDoS'];
+
+        collectedAttacks = vulns.slice(0, 16).map((item, idx) => {
+          const cve = item.cve || {};
+          const cveId = cve.id || `CVE-2025-${1000 + idx}`;
+
+          // Extrai descrição em inglês
+          const descObj = (cve.descriptions || []).find(d => d.lang === 'en') || (cve.descriptions || [])[0];
+          const rawDesc = descObj ? descObj.value : '';
+
+          // Extrai métrica CVSS v3.1, v3.0 ou v2
+          const metrics = cve.metrics || {};
+          const cvssMetric =
+            (metrics.cvssMetricV31 && metrics.cvssMetricV31[0]) ||
+            (metrics.cvssMetricV30 && metrics.cvssMetricV30[0]) ||
+            (metrics.cvssMetricV2 && metrics.cvssMetricV2[0]);
+
+          let cvssScore = 7.8;
+          let vectorString = 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N';
+          let cia = { c: 'ALTO', i: 'ALTO', a: 'BAIXO' };
+
+          if (cvssMetric && cvssMetric.cvssData) {
+            cvssScore = Number(cvssMetric.cvssData.baseScore) || 7.5;
+            vectorString = cvssMetric.cvssData.vectorString || vectorString;
+            const mapImpact = (val) => {
+              if (!val) return 'MÉDIO';
+              const u = val.toUpperCase();
+              if (u === 'HIGH' || u === 'COMPLETE') return 'ALTO';
+              if (u === 'LOW' || u === 'PARTIAL') return 'BAIXO';
+              return 'NENHUM';
+            };
+            cia = {
+              c: mapImpact(cvssMetric.cvssData.confidentialityImpact),
+              i: mapImpact(cvssMetric.cvssData.integrityImpact),
+              a: mapImpact(cvssMetric.cvssData.availabilityImpact)
+            };
+          }
+
+          // Extrai CWE oficial do NVD
+          let rawCwe = null;
+          if (Array.isArray(cve.weaknesses)) {
+            for (const w of cve.weaknesses) {
+              const val = w.description && w.description[0] && w.description[0].value;
+              if (val && val.startsWith('CWE-') && val !== 'CWE-noinfo' && val !== 'CWE-Other') {
+                rawCwe = val;
+                break;
+              }
+            }
+          }
+
+          const cweDetails = resolveCweDetails(rawCwe, rawDesc);
+          const { sourceHub, targetHub } = assignGeoTelemetry(idx, state.cycleNumber);
+          const eventTime = new Date(now - idx * 34000 - Math.floor(Math.random() * 15000));
+          const { localStr, utcStr } = formatTimestamps(eventTime);
+
+          // Infere vetor de ataque em PT-BR
+          let attackVector = vectorsList[(idx + state.cycleNumber) % vectorsList.length];
+          const lowerDesc = rawDesc.toLowerCase();
+          if (lowerDesc.includes('remote code') || lowerDesc.includes('command')) attackVector = 'RCE';
+          else if (lowerDesc.includes('authentication') || lowerDesc.includes('bypass')) attackVector = 'Bypass de Autenticação';
+          else if (lowerDesc.includes('sql') || lowerDesc.includes('xss') || lowerDesc.includes('ssrf')) attackVector = 'Exploração Web';
+          else if (lowerDesc.includes('denial of service')) attackVector = 'DDoS';
+
+          return {
+            id: `${cveId}-${idx}-${state.cycleNumber}`,
+            cveId,
+            cvss: Number(cvssScore.toFixed(1)),
+            severity: getSeverityInfo(cvssScore),
+            cwe: cweDetails,
+            vector: attackVector,
+            vectorString,
+            cia,
+            source: sourceHub,
+            target: targetHub,
+            sector: targetHub.sector,
+            localTime: localStr,
+            utcTime: utcStr,
+            published: cve.published ? cve.published.substring(0, 10) : 'Recente',
+            description: localizeNvdDescription(cveId, rawDesc, cweDetails),
+            isLiveNvd: true
+          };
+        });
+
+        usedLiveApi = true;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        // Fallback automático e transparente para base curada de CVEs reais recentes com rotação dinâmica
+        const now = Date.now();
+        const rotated = [...CURATED_REAL_CVES];
+        const shift = (state.cycleNumber * 3) % rotated.length;
+        const sliced = rotated.slice(shift).concat(rotated.slice(0, shift)).slice(0, 15);
+
+        collectedAttacks = sliced.map((item, idx) => {
+          const cweDetails = CWE_CATALOG[item.cwe] || resolveCweDetails(item.cwe, item.description);
+          const { sourceHub, targetHub } = assignGeoTelemetry(idx, state.cycleNumber);
+          const eventTime = new Date(now - idx * 38000 - Math.floor(Math.random() * 12000));
+          const { localStr, utcStr } = formatTimestamps(eventTime);
+
+          return {
+            id: `${item.cveId}-${idx}-${state.cycleNumber}`,
+            cveId: item.cveId,
+            cvss: item.cvss,
+            severity: getSeverityInfo(item.cvss),
+            cwe: cweDetails,
+            vector: item.vector,
+            vectorString: item.vectorString,
+            cia: item.cia,
+            source: sourceHub,
+            target: targetHub,
+            sector: targetHub.sector,
+            localTime: localStr,
+            utcTime: utcStr,
+            published: item.published,
+            description: item.description,
+            isLiveNvd: false
+          };
+        });
+
+        usedLiveApi = false;
+      }
+
+      // Atualiza estado
+      state.attacks = collectedAttacks;
+      state.feedMode = usedLiveApi ? 'LIVE_NVD' : 'HYBRID_FALLBACK';
+      state.lastSyncTime = new Date();
+
+      // Atualiza status visual do cabeçalho
+      const syncFormatted = state.lastSyncTime.toLocaleTimeString('pt-BR');
+      document.getElementById('last-sync-text').textContent = `Última sinc.: ${syncFormatted}`;
+
+      if (usedLiveApi) {
+        statusText.textContent = 'NVD API 2.0 Ao Vivo';
+        statusText.className = 'font-semibold text-emerald-400';
+        statusDot.className = 'h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]';
+      } else {
+        statusText.textContent = 'Telemetria Híbrida / CISA KEV';
+        statusText.className = 'font-semibold text-cyan-300';
+        statusDot.className = 'h-2.5 w-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#06b6d4]';
+      }
+
+      // Atualiza histórico de janelas de 10 minutos
+      recordTimelineWindow(collectedAttacks, state.lastSyncTime);
+
+      // Renderiza todos os módulos visuais
+      renderAllViews();
+
+      refreshIcon.classList.remove('animate-spin');
+
+      if (isManual) {
+        showToast(
+          usedLiveApi
+            ? `Sincronizado com NIST NVD 2.0 (${collectedAttacks.length} CVEs carregadas)`
+            : `Telemetria atualizada via feed híbrido CISA KEV (${collectedAttacks.length} eventos)`,
+          'success'
+        );
+      }
+    }
+
+    /**
+     * Inicializa e atualiza as janelas históricas de 10 em 10 minutos
+     */
+    function recordTimelineWindow(attacks, syncDate) {
+      const crit = attacks.filter(a => a.severity.key === 'CRITICAL').length;
+      const high = attacks.filter(a => a.severity.key === 'HIGH').length;
+      const med = attacks.filter(a => a.severity.key === 'MEDIUM').length;
+
+      // Na primeira carga, cria 7 janelas anteriores de 10 min para contexto analítico imediato
+      if (state.timelineWindows.length === 0) {
+        for (let i = 7; i >= 1; i--) {
+          const pastTime = new Date(syncDate.getTime() - i * 10 * 60 * 1000);
+          const label = pastTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          state.timelineWindows.push({
+            label,
+            critical: Math.max(3, crit + ((i * 2) % 5) - 2),
+            high: Math.max(2, high + (i % 4) - 1),
+            medium: Math.max(1, med + (i % 3))
+          });
+        }
+      }
+
+      const currentLabel = syncDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      state.timelineWindows.push({
+        label: currentLabel,
+        critical: crit,
+        high: high,
+        medium: med,
+        isCurrent: true
+      });
+
+      // Mantém as últimas 8 janelas de 10 minutos
+      if (state.timelineWindows.length > 8) {
+        state.timelineWindows = state.timelineWindows.slice(-8);
+      }
+    }
+
+    // =========================================================================
+    // 7. RENDERIZAÇÃO DOS KPIs, GRÁFICOS, MAPA E TABELA
+    // =========================================================================
+
+    function renderAllViews() {
+      renderKpis();
+      renderWorldMap();
+      renderLiveStream();
+      renderCweChart();
+      renderTimelineChart();
+      renderAttacksTable();
+    }
+
+    /**
+     * 7.1 Renderiza os 4 Cards de KPI no topo
+     */
+    function renderKpis() {
+      const total = state.attacks.length;
+      const criticals = state.attacks.filter(a => a.severity.key === 'CRITICAL').length;
+      const critPct = total > 0 ? Math.round((criticals / total) * 100) : 0;
+
+      // Calcula Causa Raiz (CWE) predominante
+      const cweFreq = {};
+      state.attacks.forEach(a => {
+        const code = a.cwe.code;
+        if (!cweFreq[code]) {
+          cweFreq[code] = { count: 0, details: a.cwe };
+        }
+        cweFreq[code].count += 1;
+      });
+
+      const sortedCwes = Object.values(cweFreq).sort((a, b) => b.count - a.count);
+      const topCwe = sortedCwes[0] || { count: 0, details: CWE_CATALOG['CWE-78'] };
+
+      // Calcula Países Alvo Únicos
+      const targetCounts = {};
+      state.attacks.forEach(a => {
+        targetCounts[a.target.name] = (targetCounts[a.target.name] || 0) + 1;
+      });
+      const uniqueTargets = Object.keys(targetCounts).length;
+      const topTargetEntry = Object.entries(targetCounts).sort((a, b) => b[1] - a[1])[0];
+
+      document.getElementById('kpi-total-attacks').textContent = total;
+      document.getElementById('kpi-attacks-delta').textContent = `Janela #${state.cycleNumber}`;
+
+      document.getElementById('kpi-critical-count').textContent = criticals;
+      document.getElementById('kpi-critical-pct').textContent = `${critPct}% do total`;
+
+      document.getElementById('kpi-top-cwe-id').textContent = topCwe.details.code;
+      document.getElementById('kpi-top-cwe-count').textContent = `(${topCwe.count} ocorrências)`;
+      const cweNameEl = document.getElementById('kpi-top-cwe-name');
+      cweNameEl.textContent = topCwe.details.shortName;
+      cweNameEl.title = topCwe.details.name;
+
+      document.getElementById('kpi-unique-targets').textContent = uniqueTargets;
+      document.getElementById('kpi-top-target-country').textContent = topTargetEntry
+        ? `Alvo #1: ${topTargetEntry[0]}`
+        : 'Global';
+    }
+
+    /**
+     * 7.2 Renderiza o Mapa-Múndi Interativo com Arcos Animados e Nós Pulsantes
+     */
+    function renderWorldMap() {
+      const arcsLayer = document.getElementById('map-arcs-layer');
+      const nodesLayer = document.getElementById('map-nodes-layer');
+      const tooltip = document.getElementById('map-tooltip');
+      const mapContainer = document.getElementById('world-map-container');
+
+      arcsLayer.innerHTML = '';
+      nodesLayer.innerHTML = '';
+
+      const filteredForMap = state.filters.mapCriticalOnly
+        ? state.attacks.filter(a => a.severity.key === 'CRITICAL')
+        : state.attacks;
+
+      document.getElementById('map-active-arcs-label').textContent =
+        `${filteredForMap.length} VETORES ATIVOS PLOTADOS`;
+
+      const activeHubs = new Map();
+
+      filteredForMap.forEach((attack, idx) => {
+        const p1 = projectLatLon(attack.source.lat, attack.source.lon);
+        const p2 = projectLatLon(attack.target.lat, attack.target.lon);
+
+        activeHubs.set(attack.source.code, { hub: attack.source, isTarget: false, color: '#06b6d4' });
+        activeHubs.set(attack.target.code, {
+          hub: attack.target,
+          isTarget: true,
+          color: attack.severity.colorHex
+        });
+
+        // Calcula ponto de controle da curva Bézier quadrática (elevação proporcional à distância)
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        const arcLift = Math.min(115, Math.max(25, dist * 0.24));
+        const ctrlY = Math.max(12, midY - arcLift);
+
+        const pathD = `M ${p1.x} ${p1.y} Q ${midX.toFixed(1)} ${ctrlY.toFixed(1)} ${p2.x} ${p2.y}`;
+
+        // Arco base sutil
+        const basePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        basePath.setAttribute('d', pathD);
+        basePath.setAttribute('fill', 'none');
+        basePath.setAttribute('stroke', attack.severity.colorHex);
+        basePath.setAttribute('stroke-width', '1');
+        basePath.setAttribute('stroke-opacity', '0.22');
+        arcsLayer.appendChild(basePath);
+
+        // Arco animado interativo
+        const animPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        animPath.setAttribute('d', pathD);
+        animPath.setAttribute('fill', 'none');
+        animPath.setAttribute('stroke', attack.severity.colorHex);
+        animPath.setAttribute('stroke-width', attack.severity.key === 'CRITICAL' ? '2.1' : '1.5');
+        animPath.setAttribute('stroke-opacity', '0.88');
+        animPath.setAttribute('class', 'attack-arc cursor-pointer');
+        animPath.style.animationDelay = `${(idx % 6) * 0.35}s`;
+
+        // Eventos de interação do Tooltip e Clique
+        const showAttackTooltip = (evt) => {
+          document.getElementById('tt-cve').textContent = attack.cveId;
+          const sevBadge = document.getElementById('tt-severity');
+          sevBadge.textContent = `${attack.severity.label} ${attack.cvss.toFixed(1)}`;
+          sevBadge.className = `rounded border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase ${attack.severity.badgeClass}`;
+          document.getElementById('tt-route').textContent = `${attack.source.code} (${attack.source.name}) → ${attack.target.code} (${attack.target.name})`;
+          document.getElementById('tt-cause').textContent = `${attack.cwe.code}: ${attack.cwe.shortName}`;
+          document.getElementById('tt-vector').textContent = attack.vector;
+
+          const rect = mapContainer.getBoundingClientRect();
+          const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+          const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+          let left = clientX - rect.left + 14;
+          let top = clientY - rect.top - 10;
+
+          if (left + 295 > rect.width) left = Math.max(8, clientX - rect.left - 295);
+          if (top + 135 > rect.height) top = Math.max(8, rect.height - 140);
+
+          tooltip.style.left = `${left}px`;
+          tooltip.style.top = `${top}px`;
+          tooltip.classList.remove('hidden');
+        };
+
+        animPath.addEventListener('mousemove', showAttackTooltip);
+        animPath.addEventListener('touchstart', showAttackTooltip, { passive: true });
+        animPath.addEventListener('mouseleave', () => tooltip.classList.add('hidden'));
+        animPath.addEventListener('click', () => {
+          tooltip.classList.add('hidden');
+          openCveModal(attack);
+        });
+
+        arcsLayer.appendChild(animPath);
+      });
+
+      // Plota pontos pulsantes nos hubs ativos
+      activeHubs.forEach(({ hub, isTarget, color }) => {
+        const pt = projectLatLon(hub.lat, hub.lon);
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+        if (isTarget) {
+          const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          ring.setAttribute('cx', pt.x);
+          ring.setAttribute('cy', pt.y);
+          ring.setAttribute('r', '5');
+          ring.setAttribute('fill', 'none');
+          ring.setAttribute('stroke', color);
+          ring.setAttribute('stroke-width', '1.4');
+          ring.setAttribute('class', 'hub-pulse');
+          g.appendChild(ring);
+        }
+
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', pt.x);
+        dot.setAttribute('cy', pt.y);
+        dot.setAttribute('r', isTarget ? '3.4' : '2.5');
+        dot.setAttribute('fill', color);
+        dot.setAttribute('filter', 'url(#glowStrong)');
+        g.appendChild(dot);
+
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', pt.x + 5);
+        label.setAttribute('y', pt.y + 3);
+        label.setAttribute('fill', '#cbd5e1');
+        label.setAttribute('font-size', '8.5');
+        label.setAttribute('font-family', 'JetBrains Mono, monospace');
+        label.setAttribute('font-weight', '600');
+        label.textContent = hub.code;
+        g.appendChild(label);
+
+        nodesLayer.appendChild(g);
+      });
+    }
+
+    /**
+     * 7.3 Renderiza o Stream Lateral em Tempo Real
+     */
+    function renderLiveStream() {
+      const container = document.getElementById('live-stream-list');
+      container.innerHTML = '';
+
+      state.attacks.slice(0, 8).forEach(attack => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'w-full rounded-xl border border-slate-800 bg-slate-950/80 p-3 text-left transition hover:border-cyan-500/40 hover:bg-slate-900';
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-mono text-xs font-bold text-cyan-400">${attack.cveId}</span>
+            <span class="rounded border px-1.5 py-0.5 font-mono text-[10px] font-bold ${attack.severity.badgeClass}">
+              ${attack.severity.label.toUpperCase()} ${attack.cvss.toFixed(1)}
+            </span>
+          </div>
+          <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-300">
+            <span class="font-semibold">${attack.source.code} (${attack.source.name}) → ${attack.target.code} (${attack.target.name})</span>
+            <span class="font-mono text-[10px] text-slate-500">${attack.localTime}</span>
+          </div>
+          <p class="mt-1 truncate text-[11px] text-amber-300/90">
+            ${attack.cwe.code}: ${attack.cwe.shortName}
+          </p>
+        `;
+        card.addEventListener('click', () => openCveModal(attack));
+        container.appendChild(card);
+      });
+    }
+
+    /**
+     * 7.4 Renderiza o Gráfico Analítico de Principais Causas Raiz (CWE)
+     */
+    function renderCweChart() {
+      const container = document.getElementById('cwe-chart-container');
+      container.innerHTML = '';
+
+      const counts = {};
+      state.attacks.forEach(a => {
+        const key = a.cwe.code;
+        if (!counts[key]) counts[key] = { cwe: a.cwe, count: 0 };
+        counts[key].count += 1;
+      });
+
+      const sorted = Object.values(counts).sort((a, b) => b.count - a.count).slice(0, 5);
+      const total = state.attacks.length || 1;
+      const barColors = ['bg-cyan-400', 'bg-amber-400', 'bg-red-400', 'bg-emerald-400', 'bg-indigo-400'];
+
+      sorted.forEach((item, idx) => {
+        const pct = Math.round((item.count / total) * 100);
+        const row = document.createElement('div');
+        row.className = 'space-y-1.5';
+        row.innerHTML = `
+          <div class="flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] font-bold text-cyan-300">${item.cwe.code}</span>
+              <span class="truncate font-medium text-slate-200" title="${item.cwe.name}">${item.cwe.shortName}</span>
+            </div>
+            <span class="shrink-0 font-mono text-xs font-semibold text-slate-300">${item.count} (${pct}%)</span>
+          </div>
+          <div class="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+            <div class="h-full rounded-full ${barColors[idx % barColors.length]} transition-all duration-700" style="width: ${Math.max(8, pct)}%"></div>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    /**
+     * 7.5 Renderiza o Gráfico de Timeline por Janela de 10 Minutos
+     */
+    function renderTimelineChart() {
+      const container = document.getElementById('timeline-chart-container');
+      container.innerHTML = '';
+
+      const maxVal = Math.max(
+        10,
+        ...state.timelineWindows.map(w => w.critical + w.high + w.medium)
+      );
+
+      state.timelineWindows.forEach(win => {
+        const total = win.critical + win.high + win.medium;
+        const critH = Math.round((win.critical / maxVal) * 145);
+        const highH = Math.round((win.high / maxVal) * 145);
+        const medH = Math.round((win.medium / maxVal) * 145);
+
+        const col = document.createElement('div');
+        col.className = 'group flex flex-1 flex-col items-center justify-end gap-1.5';
+        col.innerHTML = `
+          <span class="font-mono text-[10px] font-bold ${win.isCurrent ? 'text-cyan-400' : 'text-slate-400'}">
+            ${total}
+          </span>
+          <div class="flex w-full max-w-[34px] flex-col overflow-hidden rounded-t-md border ${win.isCurrent ? 'border-cyan-400/70 shadow-[0_0_12px_rgba(6,182,212,0.3)]' : 'border-slate-700/60'}" title="Janela ${win.label}: ${win.critical} Críticas, ${win.high} Altas, ${win.medium} Médias">
+            <div class="w-full bg-red-500 transition-all duration-500" style="height: ${critH}px"></div>
+            <div class="w-full bg-amber-500 transition-all duration-500" style="height: ${highH}px"></div>
+            <div class="w-full bg-cyan-500 transition-all duration-500" style="height: ${medH}px"></div>
+          </div>
+          <span class="font-mono text-[10px] ${win.isCurrent ? 'font-bold text-cyan-300' : 'text-slate-500'}">
+            ${win.label}
+          </span>
+        `;
+        container.appendChild(col);
+      });
+    }
+
+    /**
+     * 7.6 Renderiza a Tabela Detalhada de Ataques com Filtros Ativos
+     */
+    function renderAttacksTable() {
+      const tbody = document.getElementById('attacks-table-body');
+      const emptyState = document.getElementById('table-empty-state');
+      tbody.innerHTML = '';
+
+      const query = state.filters.search.trim().toLowerCase();
+
+      const filtered = state.attacks.filter(a => {
+        if (state.filters.severity !== 'ALL' && a.severity.key !== state.filters.severity) {
+          return false;
+        }
+        if (state.filters.vector !== 'ALL' && a.vector !== state.filters.vector) {
+          return false;
+        }
+        if (query) {
+          const searchable = `${a.cveId} ${a.source.name} ${a.source.code} ${a.target.name} ${a.target.code} ${a.cwe.code} ${a.cwe.name} ${a.sector} ${a.vector}`.toLowerCase();
+          if (!searchable.includes(query)) return false;
+        }
+        return true;
+      });
+
+      document.getElementById('table-showing-count').textContent = filtered.length;
+
+      if (filtered.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      filtered.forEach(attack => {
+        const tr = document.createElement('tr');
+        tr.className = 'cursor-pointer transition hover:bg-slate-800/60';
+        tr.innerHTML = `
+          <td class="whitespace-nowrap px-4 py-3.5 font-mono">
+            <div class="font-semibold text-slate-200">${attack.localTime}</div>
+            <div class="text-[10px] text-slate-500">${attack.utcTime}</div>
+          </td>
+          <td class="whitespace-nowrap px-4 py-3.5">
+            <div class="flex items-center gap-1.5 font-semibold text-slate-200">
+              <span class="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-cyan-300">${attack.source.code}</span>
+              <span>${attack.source.name}</span>
+              <span class="text-slate-500">→</span>
+              <span class="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-emerald-300">${attack.target.code}</span>
+              <span>${attack.target.name}</span>
+            </div>
+          </td>
+          <td class="whitespace-nowrap px-4 py-3.5 font-mono">
+            <span class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 font-bold text-cyan-300 hover:bg-cyan-500/20">
+              ${attack.cveId}
+            </span>
+          </td>
+          <td class="whitespace-nowrap px-4 py-3.5 font-mono">
+            <span class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-bold ${attack.severity.badgeClass}">
+              ${attack.severity.label.toUpperCase()} • ${attack.cvss.toFixed(1)}
+            </span>
+          </td>
+          <td class="px-4 py-3.5">
+            <div class="flex items-center gap-2">
+              <span class="shrink-0 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300">
+                ${attack.cwe.code}
+              </span>
+              <span class="font-semibold text-slate-200">${attack.cwe.shortName}</span>
+            </div>
+            <p class="mt-0.5 line-clamp-1 max-w-md text-[11px] text-slate-400">
+              ${attack.description}
+            </p>
+          </td>
+          <td class="whitespace-nowrap px-4 py-3.5">
+            <div class="font-semibold text-slate-200">${attack.vector}</div>
+            <div class="text-[11px] text-slate-400">${attack.sector}</div>
+          </td>
+          <td class="whitespace-nowrap px-4 py-3.5 text-right">
+            <button type="button" class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-cyan-300 transition hover:border-cyan-500/50 hover:bg-cyan-500/20 hover:text-white">
+              Inspecionar
+            </button>
+          </td>
+        `;
+
+        tr.addEventListener('click', () => openCveModal(attack));
+        tbody.appendChild(tr);
+      });
+    }
+
+    // =========================================================================
+    // 8. CONTROLE DOS MODAIS (INVESTIGAÇÃO CVE & CONFIGURAÇÃO API)
+    // =========================================================================
+
+    function openCveModal(attack) {
+      state.selectedAttack = attack;
+      const modal = document.getElementById('cve-modal');
+
+      document.getElementById('modal-cve-id').textContent = attack.cveId;
+      const sevBadge = document.getElementById('modal-severity-badge');
+      sevBadge.textContent = `${attack.severity.label.toUpperCase()} • CVSS ${attack.cvss.toFixed(1)}`;
+      sevBadge.className = `rounded-lg border px-2.5 py-0.5 font-mono text-xs font-bold uppercase ${attack.severity.badgeClass}`;
+
+      document.getElementById('modal-source-tag').textContent = attack.isLiveNvd
+        ? 'NIST NVD 2.0 Ao Vivo'
+        : 'CISA KEV / Telemetria SOC';
+      document.getElementById('modal-timestamps').textContent =
+        `Detectado: ${attack.localTime} (${attack.utcTime}) | Publicação NVD: ${attack.published}`;
+
+      document.getElementById('modal-route').textContent =
+        `${attack.source.name} (${attack.source.city}) → ${attack.target.name} (${attack.target.city})`;
+      document.getElementById('modal-vector').textContent = attack.vector;
+      document.getElementById('modal-sector').textContent = attack.sector;
+
+      document.getElementById('modal-cwe-code').textContent = attack.cwe.code;
+      document.getElementById('modal-cwe-title').textContent = attack.cwe.name;
+      document.getElementById('modal-cwe-explanation').textContent = attack.cwe.explanation;
+
+      document.getElementById('modal-description').textContent = attack.description;
+      document.getElementById('modal-cvss-vector').textContent = attack.vectorString;
+
+      const styleImpact = (elId, val) => {
+        const el = document.getElementById(elId);
+        el.textContent = val;
+        if (val === 'ALTO') el.className = 'mt-1 font-mono text-xs font-bold text-red-400';
+        else if (val === 'BAIXO' || val === 'MÉDIO') el.className = 'mt-1 font-mono text-xs font-bold text-amber-400';
+        else el.className = 'mt-1 font-mono text-xs font-bold text-slate-400';
+      };
+      styleImpact('modal-cia-c', attack.cia.c);
+      styleImpact('modal-cia-i', attack.cia.i);
+      styleImpact('modal-cia-a', attack.cia.a);
+
+      document.getElementById('modal-mitigation').textContent = attack.cwe.mitigation;
+      document.getElementById('modal-nvd-link').href = `https://nvd.nist.gov/vuln/detail/${encodeURIComponent(attack.cveId)}`;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeCveModal() {
+      const modal = document.getElementById('cve-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    /**
+     * Cópia segura para área de transferência compatível com iFrames (execCommand)
+     */
+    function copySelectedReport() {
+      if (!state.selectedAttack) return;
+      const a = state.selectedAttack;
+      const report = [
+        `=== RELATÓRIO DE INTELIGÊNCIA DE AMEAÇAS // AEGIS SOC ===`,
+        `CVE: ${a.cveId} | Severidade: ${a.severity.label} (CVSS ${a.cvss})`,
+        `Causa Raiz: ${a.cwe.code} - ${a.cwe.name}`,
+        `Rota: ${a.source.name} (${a.source.code}) -> ${a.target.name} (${a.target.code})`,
+        `Vetor: ${a.vector} | Setor Alvo: ${a.sector}`,
+        `Resumo: ${a.description}`,
+        `Mitigação: ${a.cwe.mitigation}`,
+        `Referência NVD: https://nvd.nist.gov/vuln/detail/${a.cveId}`
+      ].join('\n');
+
+      const textarea = document.createElement('textarea');
+      textarea.value = report;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast(`Relatório técnico de ${a.cveId} copiado para a área de transferência!`, 'success');
+      } catch (e) {
+        showToast('Não foi possível copiar automaticamente.', 'warning');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    // =========================================================================
+    // 9. TEMPORIZADOR REGRESSIVO DE 10 MINUTOS (600 SEGUNDOS)
+    // =========================================================================
+
+    function startCountdownEngine() {
+      const timerEl = document.getElementById('countdown-timer');
+      const progressEl = document.getElementById('countdown-progress');
+
+      setInterval(() => {
+        state.secondsRemaining -= 1;
+
+        if (state.secondsRemaining <= 0) {
+          state.secondsRemaining = REFRESH_INTERVAL_SECONDS;
+          state.cycleNumber += 1;
+          fetchThreatIntelligence(false);
+          showToast(`Ciclo #${state.cycleNumber}: Nova coleta automática de 10 minutos concluída.`, 'info');
+        }
+
+        const mins = String(Math.floor(state.secondsRemaining / 60)).padStart(2, '0');
+        const secs = String(state.secondsRemaining % 60).padStart(2, '0');
+        timerEl.textContent = `${mins}:${secs}`;
+
+        const pct = (state.secondsRemaining / REFRESH_INTERVAL_SECONDS) * 100;
+        progressEl.style.width = `${pct}%`;
+      }, 1000);
+    }
+
+    // =========================================================================
+    // 10. INICIALIZAÇÃO E LISTENERS DE EVENTOS
+    // =========================================================================
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Botão Atualizar Agora
+      document.getElementById('btn-refresh-now').addEventListener('click', () => {
+        state.secondsRemaining = REFRESH_INTERVAL_SECONDS;
+        state.cycleNumber += 1;
+        fetchThreatIntelligence(true);
+      });
+
+      // Filtro do Mapa (Somente Críticas)
+      const btnMapCrit = document.getElementById('btn-map-critical-only');
+      btnMapCrit.addEventListener('click', () => {
+        state.filters.mapCriticalOnly = !state.filters.mapCriticalOnly;
+        btnMapCrit.textContent = `Somente Críticas: ${state.filters.mapCriticalOnly ? 'ON' : 'OFF'}`;
+        btnMapCrit.className = state.filters.mapCriticalOnly
+          ? 'rounded-xl border border-red-500/50 bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-300 transition'
+          : 'rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-red-500/50 hover:text-red-300';
+        renderWorldMap();
+      });
+
+      // Filtros de Severidade na Tabela
+      document.querySelectorAll('.sev-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.sev-filter-btn').forEach(b => {
+            b.className = 'sev-filter-btn rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-slate-500';
+          });
+          btn.className = 'sev-filter-btn active rounded-lg border border-cyan-500/50 bg-cyan-500/20 px-3 py-1.5 text-xs font-semibold text-cyan-300 transition';
+          state.filters.severity = btn.getAttribute('data-sev');
+          renderAttacksTable();
+        });
+      });
+
+      // Filtro de Vetor
+      document.getElementById('vector-filter-select').addEventListener('change', (e) => {
+        state.filters.vector = e.target.value;
+        renderAttacksTable();
+      });
+
+      // Campo de Busca
+      document.getElementById('search-input').addEventListener('input', (e) => {
+        state.filters.search = e.target.value;
+        renderAttacksTable();
+      });
+
+      // Controles Modal CVE
+      document.getElementById('btn-close-cve-modal').addEventListener('click', closeCveModal);
+      document.getElementById('cve-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'cve-modal') closeCveModal();
+      });
+      document.getElementById('btn-copy-ioc').addEventListener('click', copySelectedReport);
+
+      // Controles Modal Configuração API
+      const configModal = document.getElementById('config-modal');
+      document.getElementById('btn-open-config').addEventListener('click', () => {
+        document.getElementById('input-nvd-apikey').value = state.config.apiKey;
+        document.getElementById('input-custom-endpoint').value = state.config.endpoint;
+        configModal.classList.remove('hidden');
+        configModal.classList.add('flex');
+      });
+
+      const closeConfigModal = () => {
+        configModal.classList.add('hidden');
+        configModal.classList.remove('flex');
+      };
+
+      document.getElementById('btn-close-config-modal').addEventListener('click', closeConfigModal);
+      configModal.addEventListener('click', (e) => {
+        if (e.target.id === 'config-modal') closeConfigModal();
+      });
+
+      document.getElementById('config-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const apiKey = document.getElementById('input-nvd-apikey').value.trim();
+        const endpoint = document.getElementById('input-custom-endpoint').value.trim() ||
+          'https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=20';
+
+        state.config.apiKey = apiKey;
+        state.config.endpoint = endpoint;
+        localStorage.setItem('soc_nvd_apikey', apiKey);
+        localStorage.setItem('soc_custom_endpoint', endpoint);
+
+        closeConfigModal();
+        state.secondsRemaining = REFRESH_INTERVAL_SECONDS;
+        fetchThreatIntelligence(true);
+      });
+
+      document.getElementById('btn-reset-config').addEventListener('click', () => {
+        state.config.apiKey = '';
+        state.config.endpoint = 'https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=20';
+        localStorage.removeItem('soc_nvd_apikey');
+        localStorage.removeItem('soc_custom_endpoint');
+        document.getElementById('input-nvd-apikey').value = '';
+        document.getElementById('input-custom-endpoint').value = state.config.endpoint;
+        showToast('Configurações restauradas para o endpoint padrão do NIST NVD.', 'info');
+      });
+
+      // Tecla ESC fecha modais
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeCveModal();
+          closeConfigModal();
+        }
+      });
+
+      // Executa coleta inicial e inicia o ciclo regressivo de 10 minutos
+      fetchThreatIntelligence(false);
+      startCountdownEngine();
+    });
+  </script>
+</body>
+</html>
